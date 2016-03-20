@@ -4,18 +4,28 @@
 ## The project now contains data from UC and MO from stage 10 and 15. 
 ## each set done in triplicate except UC stage 15 which has four replicates. 
 
-## Load libraries.
-# source("http://bioconductor.org/biocLite.R")
-# biocLite("BiocUpgrade")
 
-library( DESeq2 ) #1.6.3, up-to-date
-library( gplots )
-library( ggplot2 )
-library( RColorBrewer )
+#####################################
+## LOAD REQUIRED LIBRARIES
+#####################################
+
+### Bioconductor packages
+source("http://bioconductor.org/biocLite.R")
+biocLite("BiocUpgrade")
+library( DESeq2 ) # 1.10.1
+
+### Universal packages
+library( gplots ) # 2.17.0
+library( ggplot2 ) # 2.1.0
+library( RColorBrewer ) # 1.1-2
+
 sessionInfo()
 
+
+
+
 ## Create palettes
-pccol <- colorRampPalette( brewer.pal( 10, "Spectral" ) ) ( 6 ) # for PCA plots. I should make this less candy.
+pccol <- colorRampPalette( brewer.pal( 10, "Spectral" ) ) ( 4 ) # for PCA plots. I should make this less candy.
 distcol <- colorRampPalette( rev( brewer.pal( 9, "GnBu" ) ) ) (20) # For distance plots
 hmcolMono20 <- colorRampPalette ( brewer.pal( 9, "GnBu") ) ( 20 ) # for one color heatmaps
 hmcolBR <- colorRampPalette ( rev( brewer.pal( 9, "RdBu" ) ) ) ( 20 ) # For two color heatmaps
@@ -25,11 +35,16 @@ setwd("./")
 
 ## Create design matrix
 inDir <- file.path( paste( getwd(), "HTSeqCount_TAF15/", sep="/" ) )
-countFiles <- list.files( path= inDir, pattern= "(st10_UC*)|(st10_MO*)|(st15_UC*)|(st15_MO*)" )
-sampleIDs <- c( "UC1_ST10", "UC2_ST10", "UC3_ST10", 
+countFiles <- list.files( path= inDir, pattern= "(st10_CTR*)|(st10_MO*)|(st15_CTR*)|(st15_MO*)" )
+# sampleIDs <- c( "UC1_ST10", "UC2_ST10", "UC3_ST10", 
+#                 "MO1_ST10", "MO2_ST10", "MO3_ST10",
+#                 "UC1_ST15", "UC2_ST15", "UC3_ST15", "UC4_ST15",
+#                 "MO1_ST15", "MO2_ST15", "MO3_ST15" )
+sampleIDs <- c( "CTR1_ST10", "CTR2_ST10", "CTR3_ST10", 
                 "MO1_ST10", "MO2_ST10", "MO3_ST10",
-                "UC1_ST15", "UC2_ST15", "UC3_ST15", "UC4_ST15",
+                "CTR1_ST15", "CTR2_ST15", "CTR3_ST15", "CTR4_ST15",
                 "MO1_ST15", "MO2_ST15", "MO3_ST15" )
+
 conditions <- c( rep( "CTRL_ST10", 3 ), 
                  rep( "TAF15MO_ST10", 3 ), 
                  rep( "CTRL_ST15", 4 ), #Remember the bonus sample
@@ -40,13 +55,13 @@ tafTable <- data.frame( sampleName= sampleIDs,
                           fileName= countFiles, 
                           condition= conditions, 
                           stage= stages )
+
 tafTable # Looks good
 rm( sampleIDs, conditions, stages ) # Clean up.
 
 
 ddsTaf <- DESeqDataSetFromHTSeqCount( sampleTable = tafTable, 
                                      directory = inDir, 
-                                     #design= ~condition+stage )
                                      design= ~condition )
 
 ### Sanity plots
@@ -55,9 +70,16 @@ ddsTaf <- DESeq( ddsTaf )
 rldTaf <- rlog( ddsTaf )
 vsdTaf <- varianceStabilizingTransformation( ddsTaf )
 
-### PCA 
-### BROKEN
-plotPCA( rldTaf, intgroup= c("condition", "stage") ) + theme_bw() + geom_text( aes( label=names ), hjust= 0.5, vjust= -0.75 ) + geom_point( size= 3 )
+### PCA Plots 
+### TODO: the labels are broken
+### TODO: fix colors and point sizes and labels. Might want to roll your own.
+### TODO: Save PCA plot
+pca <- plotPCA( rldTaf, intgroup= c("condition", "stage") ) 
+pca <- pca + geom_point( size= 8, alpha = 0.3 ) + theme_bw()
+pca
+# pca + geom_text( aes( label=names ), hjust= 0.5, vjust= -0.75 ) 
+# plotPCA(object = rldTaf, returnData = TRUE)
+
 
 ### Distance plots
 distTaf <- dist( t( assay( rldTaf ) ) ) 
@@ -72,16 +94,16 @@ heatmap.2 (distTaf.mat, trace="none", col= distcol, Colv=T, Rowv=F, main= "Dista
 ###################
 ## For stage 10
 res10 <- results( ddsTaf, contrast= c( "condition", "CTRL_ST10", "TAF15MO_ST10" ) )
-table(  res10$padj < 0.1 ) # 169 genes, surprisingly few
-table( res10$padj < 0.1 & res10$log2FoldChange > abs( 1 ) ) # 34 genes
+table(  res10$padj < 0.1 ) # 296 genes
+table( res10$padj < 0.1 & res10$log2FoldChange > abs( 1 ) ) # 82 genes
 sig10 <- subset( res10, padj < 0.1 )
 sig10.2fc <- subset( res10, padj < 0.1, log2FoldChange > abs( 1 ) )
 
 ###################
 ## For stage 15
 res15 <- results ( ddsTaf, contrast= c( "condition", "CTRL_ST15", "TAF15MO_ST15" ) )
-table( res15$padj < 0.1 ) # 1853 surprisingly many
-table( res15$padj < 0.1 & res15$log2FoldChange > abs( 1 ) ) #544
+table( res15$padj < 0.1 ) # 4352 surprisingly many
+table( res15$padj < 0.1 & res15$log2FoldChange > abs( 1 ) ) # 1148 
 sig15 <- subset( res15, padj < 0.1 )
 sig15.2fc <- subset( res15, padj < 0.1 & log2FoldChange > abs( 1 ) )
 
@@ -99,6 +121,12 @@ df15 <- df15[ rownames( df15 ) %in% commonGenes, ]
 intersectDEG <- merge( df10, df15, by = "row.names", suffixes = c( ".st10", ".st15" ) )
 rownames(intersectDEG) <- intersectDEG[, 1 ]
 intersectDEG$Row.names <- NULL
+
+############################################################
+############################################################
+############# TESTED CODE TO HERE 3/19/2016
+############################################################
+############################################################
 
 ### Write files for Caitlin to look at.
 write.table( x = as.data.frame( sig10 ), file= "DEGenes4Caitlin/sigTaf15_stage10.txt", sep= "\t", quote= F )
