@@ -23,18 +23,19 @@ sessionInfo()
 
 
 
+### TODO: Move palettes to relevant sections
 
-## Create palettes
-pccol <- colorRampPalette( brewer.pal( 10, "Spectral" ) ) ( 4 ) # for PCA plots. I should make this less candy.
-distcol <- colorRampPalette( rev( brewer.pal( 9, "GnBu" ) ) ) (20) # For distance plots
-hmcolMono20 <- colorRampPalette ( brewer.pal( 9, "GnBu") ) ( 20 ) # for one color heatmaps
-hmcolBR <- colorRampPalette ( rev( brewer.pal( 9, "RdBu" ) ) ) ( 20 ) # For two color heatmaps
+### Create heatmap color palette
+hmcol <- colorRampPalette( rev( brewer.pal( 9, "RdBu" ) ) ) ( 255 )
+### Create distance matrix color palette
+distcol <- colorRampPalette( rev( brewer.pal(9, "GnBu") ) ) ( 20 )
 
 ## Set local working directory
-setwd("./")
+# setwd("./")
 
-## Create design matrix
-inDir <- file.path( paste( getwd(), "HTSeqCount_TAF15/", sep="/" ) )
+### Create design matrix
+# inDir <- file.path( paste( getwd(), "HTSeqCount_TAF15/", sep="/" ) )
+inDir <- file.path( "HTSeqCount_TAF15/" )
 countFiles <- list.files( path= inDir, pattern= "(st10_CTR*)|(st10_MO*)|(st15_CTR*)|(st15_MO*)" )
 # sampleIDs <- c( "UC1_ST10", "UC2_ST10", "UC3_ST10", 
 #                 "MO1_ST10", "MO2_ST10", "MO3_ST10",
@@ -47,7 +48,7 @@ sampleIDs <- c( "CTR1_ST10", "CTR2_ST10", "CTR3_ST10",
 
 conditions <- c( rep( "CTRL_ST10", 3 ), 
                  rep( "TAF15MO_ST10", 3 ), 
-                 rep( "CTRL_ST15", 4 ), #Remember the bonus sample
+                 rep( "CTRL_ST15", 4 ), # Remember the extra sample
                  rep( "TAF15MO_ST15", 3 ) )
 stages <- c (rep( "stage10", 6 ), 
            rep( "stage15", 7 ) )
@@ -64,27 +65,38 @@ ddsTaf <- DESeqDataSetFromHTSeqCount( sampleTable = tafTable,
                                      directory = inDir, 
                                      design= ~condition )
 
-### Sanity plots
+
 ### First the transformations
 ddsTaf <- DESeq( ddsTaf )        
 rldTaf <- rlog( ddsTaf )
 vsdTaf <- varianceStabilizingTransformation( ddsTaf )
 
-### PCA Plots 
-### TODO: the labels are broken
-### TODO: fix colors and point sizes and labels. Might want to roll your own.
-### TODO: Save PCA plot
-pca <- plotPCA( rldTaf, intgroup= c("condition", "stage") ) 
-pca <- pca + geom_point( size= 8, alpha = 0.3 ) + theme_bw()
-pca
-# pca + geom_text( aes( label=names ), hjust= 0.5, vjust= -0.75 ) 
-# plotPCA(object = rldTaf, returnData = TRUE)
+############################
+###### Sanity plots ########
+############################
 
+### PCA Plots 
+### Colors from http://colorbrewer2.org (4-class RdYlBu)
+### Note: the colors are assigned to categories alphabetically.
+pccol <- c( '#d7191c', '#2c7bb6', '#fdae61', '#abd9e9' )
+pc <- plotPCA( rldTaf, returnData = TRUE )
+
+pca <- ggplot(data = pc, aes( pc[,1], pc[,2] ) ) + theme_bw()
+pca <- pca + geom_point( size = 4, alpha = 0.7, aes( colour = group ) )   
+pca <- pca + scale_colour_manual(values = pccol, guide_legend("") ) 
+pca <- pca + ggtitle( "PCA plot\nrld transformed values")
+pca <- pca + labs(x = "PC1", y = "PC2" )
+pca <- pca + theme(legend.position = c(1, 1))
+pca
+### TODO: Save PCA plot
 
 ### Distance plots
 distTaf <- dist( t( assay( rldTaf ) ) ) 
 distTaf.mat <- as.matrix( distTaf )
-heatmap.2 (distTaf.mat, trace="none", col= distcol, Colv=T, Rowv=F, main= "Distance Matrix of TAF15 Experiment" )
+heatmap.2 (distTaf.mat, trace="none", 
+           col= distcol, 
+           Colv=T, Rowv=F, 
+           main= "Distance Matrix of TAF15 Experiment" )
 
 
 ###################
@@ -93,7 +105,7 @@ heatmap.2 (distTaf.mat, trace="none", col= distcol, Colv=T, Rowv=F, main= "Dista
 
 ###################
 ## For stage 10
-res10 <- results( ddsTaf, contrast= c( "condition", "CTRL_ST10", "TAF15MO_ST10" ) )
+res10 <- results( ddsTaf, contrast= c( "condition", "TAF15MO_ST10", "CTRL_ST10" ) )
 table(  res10$padj < 0.1 ) # 296 genes
 table( res10$padj < 0.1 & res10$log2FoldChange > abs( 1 ) ) # 82 genes
 sig10 <- subset( res10, padj < 0.1 )
@@ -101,7 +113,7 @@ sig10.2fc <- subset( res10, padj < 0.1, log2FoldChange > abs( 1 ) )
 
 ###################
 ## For stage 15
-res15 <- results ( ddsTaf, contrast= c( "condition", "CTRL_ST15", "TAF15MO_ST15" ) )
+res15 <- results ( ddsTaf, contrast= c( "condition", "TAF15MO_ST15", "CTRL_ST15" ) )
 table( res15$padj < 0.1 ) # 4352 surprisingly many
 table( res15$padj < 0.1 & res15$log2FoldChange > abs( 1 ) ) # 1148 
 sig15 <- subset( res15, padj < 0.1 )
@@ -122,18 +134,24 @@ intersectDEG <- merge( df10, df15, by = "row.names", suffixes = c( ".st10", ".st
 rownames(intersectDEG) <- intersectDEG[, 1 ]
 intersectDEG$Row.names <- NULL
 
+
+
+### Write files with DE genes.
+
+dir.create("./DEGenes_taf15")
+write.table( x = as.data.frame( sig10 ), file= "DEGenes_taf15/sigTaf15_stage10.txt", sep= "\t", quote= F )
+write.table( x= as.data.frame( sig10.2fc ), file= "DEGenes_taf15/sigTaf15_stage10_2FC.txt", sep= "\t", quote= F )
+write.table( x= as.data.frame( sig15 ), file= "DEGenes_taf15/sigTaf15_stage15.txt", sep= "\t", quote= F )
+write.table( x= as.data.frame( sig15.2fc ), file= "DEGenes_taf15/sigTaf15_stage15_2FC.txt", sep= "\t", quote= F )
+write.table( x = intersectDEG, file= "DEGenes_taf15/intersect_DEGenes.txt", sep= "\t", quote= F )
+
+
 ############################################################
 ############################################################
 ############# TESTED CODE TO HERE 3/19/2016
 ############################################################
 ############################################################
 
-### Write files for Caitlin to look at.
-write.table( x = as.data.frame( sig10 ), file= "DEGenes4Caitlin/sigTaf15_stage10.txt", sep= "\t", quote= F )
-write.table( x= as.data.frame( sig10.2fc ), file= "DEGenes4Caitlin/sigTaf15_stage10_2FC.txt", sep= "\t", quote= F )
-write.table( x= as.data.frame( sig15 ), file= "DEGenes4Caitlin/sigTaf15_stage15.txt", sep= "\t", quote= F )
-write.table( x= as.data.frame( sig15.2fc ), file= "DEGenes4Caitlin/sigTaf15_stage15_2FC.txt", sep= "\t", quote= F )
-write.table( x = intersectDEG, file= "DEGenes4Caitlin/intersect_DEGenes.txt", sep= "\t", quote= F )
 
 #################
 rm( df10, df15 ) # Clean up.
