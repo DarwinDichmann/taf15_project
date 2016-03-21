@@ -78,7 +78,7 @@ vsdTaf <- varianceStabilizingTransformation( ddsTaf )
 ### Create directory for plots
 dir.create("plots/")
 
-### PCA Plots 
+### PCA Plot
 ### Colors from http://colorbrewer2.org (4-class RdYlBu)
 ### Note: the colors are assigned to categories alphabetically.
 pccol <- c( '#d7191c', '#2c7bb6', '#fdae61', '#abd9e9' )
@@ -94,37 +94,45 @@ pca <- pca + theme(legend.position = c(0.15, 0.9))
 ggsave("plots/PCA.pdf", width = 8, height = 8)
 
 
-### Distance plots
+### Distance plot
+### Create distance matrix color palette
+### TODO: Make this pretty. Consult with somite code.
+distcol <- colorRampPalette( rev( brewer.pal(9, "GnBu") ) ) ( 10 )
+
 distTaf <- dist( t( assay( rldTaf ) ) ) 
 distTaf.mat <- as.matrix( distTaf )
-heatmap.2 (distTaf.mat, trace="none", 
+heatmap.2( distTaf.mat, trace="none", 
            col= distcol, 
-           Colv=T, Rowv=F, 
+           Colv=FALSE, Rowv=FALSE, 
            main= "Distance Matrix of TAF15 Experiment" )
 
 
-###################
-## Getting the results
-## Prepared separate sets for all DE genes and DE genes +2FC
+################################################
+### Get the results
+### Prepared separate sets for all DE genes and DE genes +2FC
+################################################
 
-###################
-## For stage 10
+################################################
+### Stage 10 results
+### Contrast: condition, numerator, denominator.
+################################################
 res10 <- results( ddsTaf, contrast= c( "condition", "TAF15MO_ST10", "CTRL_ST10" ) )
 table(  res10$padj < 0.1 ) # 296 genes
 table( res10$padj < 0.1 & res10$log2FoldChange > abs( 1 ) ) # 82 genes
 sig10 <- subset( res10, padj < 0.1 )
 sig10.2fc <- subset( res10, padj < 0.1, log2FoldChange > abs( 1 ) )
 
-###################
-## For stage 15
+################################################
+### Stage 15 results
+################################################
 res15 <- results ( ddsTaf, contrast= c( "condition", "TAF15MO_ST15", "CTRL_ST15" ) )
-table( res15$padj < 0.1 ) # 4352 surprisingly many
+table( res15$padj < 0.1 ) # 4352, surprisingly many
 table( res15$padj < 0.1 & res15$log2FoldChange > abs( 1 ) ) # 1148 
 sig15 <- subset( res15, padj < 0.1 )
 sig15.2fc <- subset( res15, padj < 0.1 & log2FoldChange > abs( 1 ) )
 
-### Intersect DE genes from stage 10 and 15
-## Find common genes
+
+### Identify shared DE genes from stage 10 and 15
 commonGenes <- intersect( sig10@rownames, sig15@rownames )
 
 ## Make stage-specific dataframe for merging
@@ -139,15 +147,19 @@ rownames(intersectDEG) <- intersectDEG[, 1 ]
 intersectDEG$Row.names <- NULL
 
 
+###############################
+### Write lists of DE genes
+###############################
 
-### Write files with DE genes.
+### Create directory for tables
+dir.create("DE_genesList")
 
-dir.create("./DEGenes_taf15")
-write.table( x = as.data.frame( sig10 ), file= "DEGenes_taf15/sigTaf15_stage10.txt", sep= "\t", quote= F )
-write.table( x= as.data.frame( sig10.2fc ), file= "DEGenes_taf15/sigTaf15_stage10_2FC.txt", sep= "\t", quote= F )
-write.table( x= as.data.frame( sig15 ), file= "DEGenes_taf15/sigTaf15_stage15.txt", sep= "\t", quote= F )
-write.table( x= as.data.frame( sig15.2fc ), file= "DEGenes_taf15/sigTaf15_stage15_2FC.txt", sep= "\t", quote= F )
-write.table( x = intersectDEG, file= "DEGenes_taf15/intersect_DEGenes.txt", sep= "\t", quote= F )
+### Write the tables
+write.table( x = as.data.frame( sig10 ), file= "DE_genesList/sigTaf15_stage10.txt", sep= "\t", quote= F )
+write.table( x= as.data.frame( sig10.2fc ), file= "DE_genesList/sigTaf15_stage10_2FC.txt", sep= "\t", quote= F )
+write.table( x= as.data.frame( sig15 ), file= "DE_genesList/sigTaf15_stage15.txt", sep= "\t", quote= F )
+write.table( x= as.data.frame( sig15.2fc ), file= "DE_genesList/sigTaf15_stage15_2FC.txt", sep= "\t", quote= F )
+write.table( x = intersectDEG, file= "DE_genesList/intersect_DEGenes.txt", sep= "\t", quote= F )
 
 
 ############################################################
