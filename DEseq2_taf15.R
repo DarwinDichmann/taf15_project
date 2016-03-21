@@ -90,8 +90,7 @@ pca <- pca + scale_colour_manual(values = pccol, guide_legend("") )
 pca <- pca + ggtitle( "PCA plot\nrld transformed values")
 pca <- pca + labs(x = "PC1", y = "PC2" )
 pca <- pca + theme(legend.position = c(0.15, 0.9))
-pca
-### TODO: Save PCA plot
+# pca
 ggsave("plots/PCA.pdf", width = 8, height = 8)
 
 
